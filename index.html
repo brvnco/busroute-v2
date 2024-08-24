@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kinderen Ophaalroute met GPS en Instructies</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC8E_GmgE1QpSLe3hHqMlPDEOy3e6ynuWA&language=nl&libraries=places"></script>
+    <style>
+        #map {
+            height: 70vh;
+            width: 100%;
+        }
+        #instructions {
+            margin-top: 10px;
+            font-size: 1.1em;
+        }
+    </style>
+    <script>
+      let map;
+      let directionsService;
+      let directionsRenderer;
+      let currentLocation;
+      let watchId;
+      let children = [
+        {"name": "Branco", "location": {"lat": 51.392468, "lng": 4.472451}, "pickedUp": false}, // Heikantstraat 80
+        {"name": "Evelyn", "location": {"lat": 51.363741, "lng": 4.477649}, "pickedUp": false}, // Kapellensteenweg 90
+        {"name": "Tim", "location": {"lat": 51.364987, "lng": 4.482939}, "pickedUp": false}    // Kapellensteenweg 117
+      ];
+
+      function initMap() {
+        directionsService = new google.maps.DirectionsService();
+        directionsRenderer = new google.maps.DirectionsRenderer({suppressMarkers: true});
+        map = new google.maps.Map(document.getElementById("map"), {
+          zoom: 14,
+        });
+        directionsRenderer.setMap(map);
+
+        // Start het volgen van de GPS-locatie
+        if (navigator.geolocation) {
+          watchId = navigator.geolocation.watchPosition(position => {
+            currentLocation = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            };
+            map.setCenter(currentLocation);
+
+            // Update de route als er nog geen route is of bij de eerste locatie
+            if (!directionsRenderer.getDirections()) {
+              calculateAndDisplayRoute();
+            }
+          }, () => {
+            alert('Kon je locatie niet ophalen.');
+          });
+        } else {
+          alert('Geolocatie wordt niet ondersteund door deze browser.');
+        }
+      }
+
+      function calculateAndDisplayRoute() {
+        let nextStop = null;
+
+        for (let i = 0; i < children.length; i++) {
+          if (!children[i].pickedUp) {
+            nextStop = children[i].location;
+            document.getElementById("pickup").innerHTML = "Bevestig dat " + children[i].name + " is opgehaald.";
+            document.getElementById("confirm").onclick = () => confirmPickup(i);
+            break;
+          }
+        }
+
+        if (nextStop && currentLocation) {
+          directionsService.route(
+            {
+              origin: currentLocation,
+              destination: nextStop,
+              travelMode: google.maps.TravelMode.DRIVING,
+            },
+            (response, status) => {
+              if (status === "OK") {
+                directionsRenderer.setDirections(response);
+                displayRouteInstructions(response);
+              } else {
+                window.alert("Route-aanvraag is mislukt vanwege: " + status);
+              }
+            }
+          );
+        } else if (!nextStop) {
+          window.alert("Alle kinderen zijn opgehaald!");
+        }
+      }
+
+      function displayRouteInstructions(response) {
+        const instructions = document.getElementById('instructions');
+        const steps = response.routes[0].legs[0].steps;
+        instructions.innerHTML = '';
+
+        for (let i = 0; i < steps.length; i++) {
+          const step = steps[i];
+          instructions.innerHTML += `<p>${step.instructions}</p>`;
+        }
+      }
+
+      function confirmPickup(childIndex) {
+        children[childIndex].pickedUp = true;
+        calculateAndDisplayRoute();
+      }
+    </script>
+</head>
+<body onload="initMap()">
+    <div id="map"></div>
+    <div id="pickup" style="padding: 10px; text-align: center; font-size: 1.2em;"></div>
+    <button id="confirm" style="display: block; margin: 10px auto; padding: 10px 20px; font-size: 1em;">Bevestig</button>
+    <div id="instructions"></div>
+</body>
+</html>
